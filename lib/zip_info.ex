@@ -1,6 +1,6 @@
 defmodule ZipInfo do
   @moduledoc """
-  Reads and parses the entrys inside a ZIP archive.
+  Extracts information from a ZIP file.
   """
 
   # The standard format for ZIP files is as follows:
@@ -31,9 +31,43 @@ defmodule ZipInfo do
 
   @type error :: File.posix() | :badarg | :terminated | :corrupt
 
-  @spec stream(IO.device()) :: Enum.t()
-  def stream(io) do
-    Stream.unfold(:ok, fn _ -> read!(io) end)
+  @doc """
+  Creates a new stream that will emit information about each
+  file in the ZIP.
+
+  ## Examples
+
+      iex> {:ok, file} = File.open("fixture.zip", [:read, :binary])
+      {:ok, #PID<0.107.0>}
+
+      iex> file |> ZipInfo.stream!() |> Enum.to_list()
+      [%ZipFile.Entry{name: "a.txt", size: 22, compressed_size: 20}]
+
+  """
+  @spec stream!(IO.device()) :: Enum.t()
+  def stream!(io) do
+    Stream.unfold(:ok, fn :ok -> read!(io) end)
+  end
+
+  @doc """
+  Lists all of the files in the ZIP.
+
+  ## Examples
+
+      iex> {:ok, file} = File.open("fixture.zip", [:read, :binary])
+      {:ok, [%ZipFile.Entry{name: "a.txt", size: 22, compressed_size: 20}]}
+
+  """
+  def list(io) do
+    list(io, [])
+  end
+
+  defp list(io, entries) do
+    case read(io) do
+      {:ok, entry} -> list(io, entries ++ [entry])
+      {:error, reason} -> {:error, reason}
+      :eof -> {:ok, entries}
+    end
   end
 
   @doc false
@@ -60,8 +94,6 @@ defmodule ZipInfo do
 
   # This file probably contains a data descriptor. Search for the next
   # header byte-by-byte, then rewind once we've found it.
-  #
-  # See: #Data_descriptor
   defp advance(io, %Entry{compressed_size: 0} = entry) do
     with {:ok, data} <- binread(io, 12) do
       case parse_data_descriptor(data) do
