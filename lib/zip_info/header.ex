@@ -1,22 +1,35 @@
-defmodule ZipInfo.Entry do
+defmodule ZipInfo.Header do
   @size 46
   @signature <<0x50, 0x4B, 0x01, 0x02>>
+  @end_signature <<0x50, 0x4B, 0x05, 0x06>>
+
+  @type location :: :file.location()
+
+  @type t :: %__MODULE__{
+          name: binary(),
+          comment: binary(),
+          offset: non_neg_integer(),
+          size: non_neg_integer(),
+          compressed_size: non_neg_integer()
+        }
 
   defstruct [
     :name,
     :comment,
-    :compressed_size,
     :size,
-    :offset
+    :offset,
+    :compressed_size
   ]
 
-  def read(io, offset \\ :cur) do
-    with {:ok, data} <- :file.pread(io, offset, @size),
-         {:ok, entry, sizes} <- parse(data),
+  @doc false
+  @spec read(IO.device(), location()) :: {:ok, t} | {:error, ZipInfo.reason()} | :eof
+  def read(io, location \\ :cur) do
+    with {:ok, data} <- :file.pread(io, location, @size),
+         {:ok, header, sizes} <- parse(data),
          {:ok, name} <- :file.read(io, sizes.name),
          {:ok, _} <- :file.position(io, {:cur, sizes.extra}),
          {:ok, comment} <- :file.read(io, sizes.comment) do
-      {:ok, %__MODULE__{entry | name: name, comment: comment}}
+      {:ok, %__MODULE__{header | name: name, comment: comment}}
     end
   end
 
@@ -39,10 +52,11 @@ defmodule ZipInfo.Entry do
          _external_file_attributes::little-size(32),
          offset::little-size(32)
        >>) do
-    entry = %__MODULE__{size: size, compressed_size: compressed_size, offset: offset}
+    header = %__MODULE__{size: size, compressed_size: compressed_size, offset: offset}
     sizes = %{name: name_length, extra: extra_length, comment: comment_length}
-    {:ok, entry, sizes}
+    {:ok, header, sizes}
   end
 
+  defp parse(<<@end_signature>> <> _), do: :eof
   defp parse(_), do: {:error, :invalid}
 end
