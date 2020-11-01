@@ -7,13 +7,17 @@ defmodule ZipInfoTest do
   @tag io: "test/fixtures/fixture.zip"
   test "fixture.zip", %{io: io} do
     assert {:ok, 2} = ZipInfo.count(io)
-    assert {:ok, [_, _]} = ZipInfo.list(io)
+    assert {:ok, [a, _]} = ZipInfo.list(io)
+    assert {:ok, "Hello!" <> _} = ZipInfo.read(io, a)
+    assert {:ok, "Hello"} = ZipInfo.read(io, a, bytes: 5)
   end
 
   @tag io: "test/fixtures/fixture-data-descriptor.zip"
   test "fixture-data-descriptor", %{io: io} do
     assert {:ok, 2} = ZipInfo.count(io)
-    assert {:ok, [_, _]} = ZipInfo.list(io)
+    assert {:ok, [_, b]} = ZipInfo.list(io)
+    assert {:ok, <<_::binary-size(24)>>} = ZipInfo.read(io, b)
+    assert {:ok, <<_::binary-size(5)>>} = ZipInfo.read(io, b, bytes: 5)
   end
 
   @tag io: "test/fixtures/fixture-corrupt.zip"

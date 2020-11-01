@@ -11,6 +11,7 @@ defmodule ZipInfo do
 
   alias ZipInfo.CentralDirectory
   alias ZipInfo.Header
+  alias ZipInfo.LocalHeader
 
   @type reason :: File.posix() | :badarg | :terminated | :invalid
 
@@ -46,12 +47,33 @@ defmodule ZipInfo do
     end
   end
 
-  defp list(io, offset, entries) do
+  defp list(io, offset, headers) do
     case Header.read(io, offset) do
-      {:ok, header} -> list(io, :cur, entries ++ [header])
+      {:ok, header} -> list(io, :cur, headers ++ [header])
       {:error, reason} -> {:error, reason}
-      :eof -> {:ok, entries}
+      :eof -> {:ok, headers}
     end
+  end
+
+  @doc """
+  Read raw, compressed bytes from the ZIP for a given entry.
+
+  This will not attempt to decompress the data.
+
+  ## Options
+
+    `:bytes` - The maximum number of bytes to read.
+
+  ## Examples
+
+      iex> ZipInfo.read(io, header)
+      {:ok,  "this is content."}
+
+  """
+  @spec read(IO.device(), Header.t(), Keyword.t()) :: {:ok, binary()} | {:error, reason}
+  def read(io, %Header{offset: offset, compressed_size: size}, opts \\ []) do
+    bytes = Keyword.get(opts, :bytes, size)
+    LocalHeader.read_data(io, offset, min(bytes, size))
   end
 
   @doc """
