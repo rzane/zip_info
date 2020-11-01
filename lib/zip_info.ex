@@ -58,6 +58,7 @@ defmodule ZipInfo do
       {:ok, [%ZipFile.Entry{name: "a.txt", size: 22, compressed_size: 20}]}
 
   """
+  @spec list(IO.device()) :: {:ok, [Entry.t()]} | {:error, error}
   def list(io) do
     list(io, [])
   end
@@ -70,9 +71,7 @@ defmodule ZipInfo do
     end
   end
 
-  @doc false
-  @spec read!(IO.device()) :: Entry.t() | nil
-  def read!(io) do
+  defp read!(io) do
     case read(io) do
       {:ok, entry} -> {entry, :ok}
       {:error, reason} -> raise ZipInfo.Error, reason: reason
@@ -80,9 +79,7 @@ defmodule ZipInfo do
     end
   end
 
-  @doc false
-  @spec read(IO.device()) :: {:ok, Entry.t()} | {:error, error} | :eof
-  def read(io) do
+  defp read(io) do
     with {:ok, data} <- binread(io, 30),
          {:ok, entry, meta} <- parse_local_header(data),
          {:ok, name} <- binread(io, meta.name_length),
@@ -154,7 +151,7 @@ defmodule ZipInfo do
   # This scenario would happen under two circumstances:
   #   1. The IO isn't at the start position.
   #   2. You gave us something that doesn't look like a ZIP.
-  defp parse_local_header(_), do: {:error, :corrput}
+  defp parse_local_header(_), do: {:error, :invalid}
 
   # This will match the last 8 bytes of a data descriptor, as indicated
   # by the presence of a local header or central directory signature in the
