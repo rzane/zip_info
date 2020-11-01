@@ -112,6 +112,8 @@ defmodule ZipInfo do
     end
   end
 
+  # This is the 99% case. We usually know the compressed size,
+  # in which case, we just move past those bytes.
   defp advance(io, %Entry{compressed_size: offset} = entry) do
     with {:ok, _} <- move(io, offset) do
       {:ok, entry}
