@@ -4,12 +4,12 @@ defmodule ZipInfoTest do
 
   @tag io: "test/fixtures/fixture.zip"
   test "ZipInfo.read/1", %{io: io} do
-    assert {:ok, header} = ZipInfo.read(io)
+    assert {:ok, a} = ZipInfo.read(io)
+    assert a.name == "a.txt"
 
-    assert header == %ZipInfo{
-             name: "a.txt",
-             compressed_size: 22,
-             uncompressed_size: 22
-           }
+    assert {:ok, b} = ZipInfo.read(io)
+    assert b.name == "b.txt"
+
+    assert :eof = ZipInfo.read(io)
   end
 end

@@ -7,7 +7,7 @@ defmodule ZipInfo do
 
   defstruct [:name, :compressed_size, :uncompressed_size]
 
-  @type error :: File.posix() | :badarg | :terminated | :corrupt
+  @type error :: File.posix() | :badarg | :terminated
 
   @type t :: %__MODULE__{
           name: binary(),
@@ -20,11 +20,13 @@ defmodule ZipInfo do
   end
 
   @doc false
-  @spec read(IO.device()) :: {:ok, t()} | {:error, error}
+  @spec read(IO.device()) :: {:ok, t()} | {:error, error} | :eof
   def read(io) do
     with {:ok, data} <- binread(io, 30),
-         {:ok, {header, name_length, _extra_length}} <- parse(data),
-         {:ok, name} <- binread(io, name_length) do
+         {:ok, header, meta} <- parse(data),
+         {:ok, name} <- binread(io, meta.name_size),
+         {:ok, _} <- shift(io, meta.extra_size),
+         {:ok, _} <- shift(io, header.compressed_size) do
       {:ok, %__MODULE__{header | name: name}}
     end
   end
@@ -37,18 +39,27 @@ defmodule ZipInfo do
     end
   end
 
+  defp shift(io, offset) do
+    :file.position(io, {:cur, offset})
+  end
+
   defp parse(
          <<80, 75, 3, 4, _version::uint(16), _flag::uint(16), _compression_method::uint(16),
            _mtime::uint(16), _mdate::uint(16), _crc32::uint(32), compressed_size::uint(32),
-           uncompressed_size::uint(32), name_length::uint(16), extra_length::uint(16)>>
+           uncompressed_size::uint(32), name_size::uint(16), extra_size::uint(16)>>
        ) do
     header = %__MODULE__{
       compressed_size: compressed_size,
       uncompressed_size: uncompressed_size
     }
 
-    {:ok, {header, name_length, extra_length}}
+    meta = %{
+      name_size: name_size,
+      extra_size: extra_size
+    }
+
+    {:ok, header, meta}
   end
 
-  defp parse(_), do: {:error, :corrupt}
+  defp parse(_), do: :eof
 end
