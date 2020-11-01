@@ -1,0 +1,2 @@
+defmodule ZipInfo do
+end
