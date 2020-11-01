@@ -1,9 +1,13 @@
 defmodule ZipInfo.Header do
+  @moduledoc """
+  Represents a file inside the ZIP archive.
+  """
+
   @size 46
   @signature <<0x50, 0x4B, 0x01, 0x02>>
   @end_signature <<0x50, 0x4B, 0x05, 0x06>>
 
-  @type location :: :file.location()
+  @type location :: integer() | :cur
 
   @type t :: %__MODULE__{
           name: binary(),
