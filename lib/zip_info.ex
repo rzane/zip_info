@@ -3,35 +3,19 @@ defmodule ZipInfo do
   Reads and parses the headers inside a zip file.
   """
 
-  defstruct [
-    :filename,
-    :filename_length,
-    :extra,
-    :extra_length,
-    :compressed_size,
-    :uncompressed_size
-  ]
+  alias ZipInfo.Entry
 
   @type error :: File.posix() | :badarg | :terminated
 
-  @type t :: %__MODULE__{
-          filename: binary(),
-          filename_length: non_neg_integer(),
-          extra: binary(),
-          extra_length: non_neg_integer(),
-          compressed_size: non_neg_integer(),
-          uncompressed_size: non_neg_integer()
-        }
-
   @doc false
-  @spec read(IO.device()) :: {:ok, t()} | {:error, error} | :eof
+  @spec read(IO.device()) :: {:ok, Entry.t()} | {:error, error} | :eof
   def read(io) do
     with {:ok, data} <- binread(io, 30),
-         {:ok, header} <- parse(data),
-         {:ok, filename} <- binread(io, header.filename_length),
-         {:ok, extra} <- binread(io, header.extra_length),
+         {:ok, header, meta} <- parse(data),
+         {:ok, name} <- binread(io, meta.name_length),
+         {:ok, extra} <- binread(io, meta.extra_length),
          {:ok, _} <- ignore(io, header.compressed_size) do
-      {:ok, %__MODULE__{header | filename: filename, extra: extra}}
+      {:ok, %Entry{header | name: name, extra: extra}}
     end
   end
 
@@ -47,28 +31,34 @@ defmodule ZipInfo do
     :file.position(io, {:cur, offset})
   end
 
-  defmacrop uint(size) do
-    quote do: little - signed - integer - size(unquote(size))
-  end
-
   # https://en.wikipedia.org/wiki/Zip_(file_format)#Local_file_header
   defp parse(
-         <<80, 75, 3, 4, _version::uint(16), _flag::uint(16), _compression_method::uint(16),
-           _mtime::uint(16), _mdate::uint(16), _crc32::uint(32), compressed_size::uint(32),
-           uncompressed_size::uint(32), filename_length::uint(16), extra_length::uint(16)>>
+         <<0x04034B50::little-size(32), _version::little-size(16), flags::little-size(16),
+           _compression_method::little-size(16), _last_modified_time::little-size(16),
+           _last_modified_date::little-size(16), _crc32::little-size(32),
+           compressed_size::little-size(32), size::little-size(32), name_length::little-size(16),
+           extra_length::little-size(16)>>
        ) do
-    header = %__MODULE__{
-      compressed_size: compressed_size,
-      uncompressed_size: uncompressed_size,
-      filename_length: filename_length,
+    header = %Entry{
+      flags: flags,
+      size: size,
+      compressed_size: compressed_size
+    }
+
+    meta = %{
+      name_length: name_length,
       extra_length: extra_length
     }
 
-    {:ok, header}
+    {:ok, header, meta}
   end
 
   # https://en.wikipedia.org/wiki/Zip_(file_format)#Central_directory_file_header
-  defp parse(<<80, 75, 1, 2>> <> _), do: :eof
+  defp parse(<<0x02014B50::little-size(32)>> <> _) do
+    :eof
+  end
 
-  defp parse(_), do: {:error, :corrput}
+  defp parse(_) do
+    {:error, :corrput}
+  end
 end
