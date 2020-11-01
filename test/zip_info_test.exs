@@ -5,6 +5,24 @@ defmodule ZipInfoTest do
   alias ZipInfo.Header
 
   @tag io: "test/fixtures/fixture.zip"
+  test "fixture.zip", %{io: io} do
+    assert {:ok, 2} = ZipInfo.count(io)
+    assert {:ok, [_, _]} = ZipInfo.list(io)
+  end
+
+  @tag io: "test/fixtures/fixture-data-descriptor.zip"
+  test "fixture-data-descriptor", %{io: io} do
+    assert {:ok, 2} = ZipInfo.count(io)
+    assert {:ok, [_, _]} = ZipInfo.list(io)
+  end
+
+  @tag io: "test/fixtures/fixture-corrupt.zip"
+  test "fixture-corrupt", %{io: io} do
+    assert {:error, :invalid} = ZipInfo.count(io)
+    assert {:error, :invalid} = ZipInfo.list(io)
+  end
+
+  @tag io: "test/fixtures/fixture.zip"
   test "CentralDirectory.find/1", %{io: io} do
     assert {:ok, directory} = CentralDirectory.find(io)
     assert directory.count == 2
@@ -30,10 +48,5 @@ defmodule ZipInfoTest do
     assert header.comment == ""
 
     assert :eof = Header.read(io)
-  end
-
-  @tag io: "test/fixtures/fixture.zip"
-  test "ZipInfo.list/1", %{io: io} do
-    assert {:ok, [_, _]} = ZipInfo.list(io)
   end
 end

@@ -1,11 +1,12 @@
 defmodule ZipInfo.CentralDirectory do
+  @moduledoc false
+
   @size 22
   @signature <<0x50, 0x4B, 0x05, 0x06>>
 
   @enforce_keys [:start, :count]
   defstruct [:start, :count]
 
-  @doc false
   def find(io) do
     find(io, {:eof, -@size})
   end
