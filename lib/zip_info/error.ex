@@ -6,6 +6,6 @@ defmodule ZipInfo.Error do
     %ZipInfo.Error{reason: reason, message: translate(reason)}
   end
 
-  defp translate(:corrupt), do: "the zip file might be corrupt"
+  defp translate(:invalid), do: "the zip file has an invalid format"
   defp translate(reason), do: reason |> :file.format_error() |> to_string()
 end

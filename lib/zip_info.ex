@@ -29,7 +29,7 @@ defmodule ZipInfo do
   @local_header <<80, 75, 3, 4>>
   @central_directory <<80, 75, 1, 2>>
 
-  @type error :: File.posix() | :badarg | :terminated | :corrupt
+  @type error :: File.posix() | :badarg | :terminated | :invalid
 
   @doc """
   Creates a new stream that will emit information about each
