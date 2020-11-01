@@ -15,10 +15,16 @@ defmodule ZipInfo.CentralDirectory do
          do: find(io, {:cur, -1})
   end
 
-  defp parse(
-         <<@signature, _::binary-size(6), count::little-size(16), _::binary-size(4),
-           start::little-size(32), _::binary-size(2)>>
-       ) do
+  defp parse(<<
+         @signature,
+         _disk_number::little-size(16),
+         _start_disk_number::little-size(16),
+         _count_on_disk::little-size(16),
+         count::little-size(16),
+         _central_directory_size::little-size(32),
+         start::little-size(32),
+         _comment_length::little-size(16)
+       >>) do
     {:ok, %__MODULE__{start: start, count: count}}
   end
 
