@@ -21,8 +21,13 @@ defmodule ZipInfo do
   #     [compress data 2 (unknown size)] <- Ignore this
   #     [data descriptor 2]              <- We also need to parse this
   #     [central directory]              <- We're done!
+  #
+  # For more information, see: https://en.wikipedia.org/wiki/Zip_(file_format)
 
   alias ZipInfo.Entry
+
+  @local_header <<80, 75, 3, 4>>
+  @central_directory <<80, 75, 1, 2>>
 
   @type error :: File.posix() | :badarg | :terminated | :corrupt
 
@@ -56,7 +61,7 @@ defmodule ZipInfo do
   # This file probably contains a data descriptor. Search for the next
   # header byte-by-byte, then rewind once we've found it.
   #
-  # See: https://en.wikipedia.org/wiki/Zip_(file_format)#Data_descriptor
+  # See: #Data_descriptor
   defp advance(io, %Entry{compressed_size: 0} = entry) do
     with {:ok, data} <- binread(io, 12) do
       case parse_data_descriptor(data) do
@@ -93,10 +98,9 @@ defmodule ZipInfo do
     :file.position(io, {:cur, count})
   end
 
-  # Extract data from the local header
-  # See: https://en.wikipedia.org/wiki/Zip_(file_format)#Local_file_entry
+  # This matches a local header
   defp parse_local_header(
-         <<0x04034B50::little-size(32), _version::little-size(16), _flags::little-size(16),
+         <<@local_header, _version::little-size(16), _flags::little-size(16),
            _compression_method::little-size(16), _last_modified_time::little-size(16),
            _last_modified_date::little-size(16), _crc32::little-size(32),
            compressed_size::little-size(32), size::little-size(32), name_length::little-size(16),
@@ -107,26 +111,30 @@ defmodule ZipInfo do
     {:ok, entry, meta}
   end
 
-  # We've found the start of the central directory, which tells us that there are
-  # no more local headers.
-  # See: https://en.wikipedia.org/wiki/Zip_(file_format)#Central_directory_file_entry
-  defp parse_local_header(<<0x02014B50::little-size(32)>> <> _) do
+  # This matches the start of the central directory, which tells us that
+  # there are no more local headers to parse.
+  defp parse_local_header(@central_directory <> _) do
     :eof
   end
 
-  defp parse_local_header(_) do
-    {:error, :corrput}
+  # This scenario would happen under two circumstances:
+  #   1. The IO isn't at the start position.
+  #   2. You gave us something that doesn't look like a ZIP.
+  defp parse_local_header(_), do: {:error, :corrput}
+
+  # This will match the last 8 bytes of a data descriptor, as indicated
+  # by the presence of a local header or central directory signature in the
+  # last four bytes.
+  defp parse_data_descriptor(bytes) do
+    case bytes do
+      <<compressed_size::little-size(32), size::little-size(32), @local_header>> ->
+        {:ok, size, compressed_size}
+
+      <<compressed_size::little-size(32), size::little-size(32), @central_directory>> ->
+        {:ok, size, compressed_size}
+
+      _ ->
+        :error
+    end
   end
-
-  defp parse_data_descriptor(
-         <<compressed_size::little-size(32), size::little-size(32), 0x04034B50::little-size(32)>>
-       ),
-       do: {:ok, size, compressed_size}
-
-  defp parse_data_descriptor(
-         <<compressed_size::little-size(32), size::little-size(32), 0x02014B50::little-size(32)>>
-       ),
-       do: {:ok, size, compressed_size}
-
-  defp parse_data_descriptor(_), do: :error
 end
