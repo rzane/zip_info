@@ -1,8 +1,6 @@
 defmodule ZipInfo do
   @moduledoc """
   Reads and parses the headers inside a zip file.
-
-  See: https://en.wikipedia.org/wiki/Zip_(file_format)#Local_file_header
   """
 
   defstruct [
@@ -53,6 +51,7 @@ defmodule ZipInfo do
     quote do: little - signed - integer - size(unquote(size))
   end
 
+  # https://en.wikipedia.org/wiki/Zip_(file_format)#Local_file_header
   defp parse(
          <<80, 75, 3, 4, _version::uint(16), _flag::uint(16), _compression_method::uint(16),
            _mtime::uint(16), _mdate::uint(16), _crc32::uint(32), compressed_size::uint(32),
@@ -68,7 +67,8 @@ defmodule ZipInfo do
     {:ok, header}
   end
 
-  defp parse(_) do
-    {:error, :corrput}
-  end
+  # https://en.wikipedia.org/wiki/Zip_(file_format)#Central_directory_file_header
+  defp parse(<<80, 75, 1, 2>> <> _), do: :eof
+
+  defp parse(_), do: {:error, :corrput}
 end
